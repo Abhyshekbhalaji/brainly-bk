@@ -4,12 +4,13 @@ import { middleWareAuth } from "../middleware/index.js";
 import { content } from "../models/Content.js";
 import jwt ,{JwtPayload} from 'jsonwebtoken';
 import { Users } from "../models/Users.js";
+import { tag } from "../models/Tag.js";
 
 const router=Router();  
 
 router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{    
         try {
-          let {type,link,title}=req.body;
+          let {type,link,title,tags}=req.body;
         let token = req.headers['token'];  
              if (!token || Array.isArray(token)) {
       return res.status(401).json({ message: "Token missing or invalid" });
@@ -26,8 +27,18 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
           message: "User not found",
         });
     }
-      
-         let cn= await content.create({type,link,title,userId: user._id });
+
+    let contentTags=[];
+         if(tags.length>0){
+            for(let s of tags){
+              let t=  await tag.findOne({title:s});
+              if(!t){
+                t= await tag.create({title:s});
+              }
+              contentTags.push(t);
+            }
+        }
+         let cn= await content.create({type,link,title,tags:contentTags,userId: user._id });
           await cn.save();
             return res.status(201).json({
                 success:true,

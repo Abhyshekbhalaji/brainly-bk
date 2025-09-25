@@ -115,30 +115,29 @@ if (!process.env.SECRET_KEY) {
 }
 
 })
-router.get('/brain/share/:hashId',async(req,res)=>{
+router.get('/brain/share/link',async(req,res)=>{
    
 
     try {
-      let hash_id = req.params.hashId;   
+      let hash_id = req.query.hashId;   
      let con= await link.findOne({hashId:hash_id});
-     console.log(con);
+
 
      if(!con){
         return res.status(403).json({
             success:false,
             message:"Invalid hashId. Check the url",
-            content:null,
+
             post:null
         })
      }
 
     let post= await content.findById(con.postId)
-    console.log(post);
+
      return res.status(201).json({
         success:true,
         message:"Post is retrieved from the user",
-        content:content,
-        post:post       
+        posts:post       
         })
     } catch (error:any) {
         return res.status(500).send({
