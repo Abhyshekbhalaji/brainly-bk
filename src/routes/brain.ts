@@ -13,7 +13,7 @@ const router=Router();
 router.post('/brain/share/:contentId',middleWareAuth , async(req,res)=> {
 try {
     let token = req.token!;
-
+       const base_url=process.env.DEPLOY_URL? process.env.DEPLOY_URL:'http://localhost:3000/'
     if(!req.params.contentId){
         return res.status(403).json({
             success:false,
@@ -51,13 +51,13 @@ if (!process.env.SECRET_KEY) {
     let post_id= posts[contentId]!._id.toString();
  
     let hash_id = bcrypt.hashSync(post_id,12);
-
+   
     let share =await link.create({hashId:hash_id ,postId:posts[contentId], userId:loggedUser});
         await share.save();
- 
+  let share_url=base_url+'share/link?hashId='+hash_id;
         return res.status(201).json({
             success:true,
-            hash_id,
+            share_url,
             message:"Link has been generated successfully!!" 
         })
 } catch (error : any) {
@@ -115,37 +115,7 @@ if (!process.env.SECRET_KEY) {
 }
 
 })
-router.get('/brain/share/link',async(req,res)=>{
-   
 
-    try {
-      let hash_id = req.query.hashId;   
-     let con= await link.findOne({hashId:hash_id});
-
-
-     if(!con){
-        return res.status(403).json({
-            success:false,
-            message:"Invalid hashId. Check the url",
-
-            post:null
-        })
-     }
-
-    let post= await content.findById(con.postId)
-
-     return res.status(201).json({
-        success:true,
-        message:"Post is retrieved from the user",
-        posts:post       
-        })
-    } catch (error:any) {
-        return res.status(500).send({
-            message:error.message || "Internal server error",
-            success:false
-        })
-    }
-})
 
 export default router;
 

@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "cmp": "npx tsc -b",
-    "it": "node dist/index.js"
+    "start": "npx tsc -b && node dist/index.js"
+    
   },
   "type": "module",
   "module": "NodeNext",
