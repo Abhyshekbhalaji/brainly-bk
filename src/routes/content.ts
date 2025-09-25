@@ -4,7 +4,7 @@ import { middleWareAuth } from "../middleware/index.js";
 import { content } from "../models/Content.js";
 import jwt ,{JwtPayload} from 'jsonwebtoken';
 import { Users } from "../models/Users.js";
-import { tag } from "../models/Tag.js";
+import {  tag } from "../models/Tag.js";
 
 const router=Router();  
 
@@ -59,6 +59,8 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
         }
 
     })
+
+
     router.get('/content' , middleWareAuth,async(req:Request, res:Response)=>{
         
         try {
@@ -101,6 +103,124 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
             })
         }
         
+    })
+
+
+    router.get('/content/search' , middleWareAuth,async(req:Request, res:Response)=>{
+        try {
+         let token = req.token!;
+         let queryTitle = req.query.title;
+              if (!process.env.SECRET_KEY) {
+  throw new Error("SECRET_KEY is missing in environment variables");
+}
+         const decoded= jwt.verify(token,process.env.SECRET_KEY) as JwtPayload;
+      if(!decoded.username){
+               return res.status(402).json({
+                message:"User not available in this db ,Please login again",
+                success:false
+            })
+         }
+
+         const user=  await Users.findOne({username:decoded.username});
+         if(!user){
+            return res.status(402).json({
+                message:"User of this post not available in this db ,Please login again",
+                success:false
+            })
+         }
+         const payload= await content.find({title: { $regex: queryTitle, $options: "i" }});  
+         if (!payload || payload.length === 0) {
+   return res.status(404).json({
+     message: "No content found with that title",
+     success: false
+   });
+}
+
+         return res.status(201).json({
+                content:payload,
+                success:true,
+                message:'Retrieval Success'
+            }) 
+        } catch (error : any) {
+            return res.status(500).json({
+                success:false,
+                message:error.message || "Internal server error"
+            })
+        }
+        
+    })
+
+
+    router.put('/content/edit',middleWareAuth,async(req:Request,res:Response)=>{
+        try {
+          let contentId =req.query.id;
+        
+          let {title,link,tags,type}=req.body;
+          if(!contentId){
+            return res.status(403).json({
+              success:false,
+              message:"Id is required",
+            })
+          }
+
+          let token = req.headers['token']?.toString();
+          if(!token) {
+               return res.status(403).json({
+              success:false,
+              message:"Login before editing",
+            })
+          } 
+                  if (!process.env.SECRET_KEY) {
+  throw new Error("SECRET_KEY is missing in environment variables");
+}
+          let {username}  = jwt.verify(token,process.env.SECRET_KEY) as JwtPayload;
+
+         let user= await Users.findOne({username});
+         if(!user){
+          return res.status(403).json({
+            succcess:false,
+            message:"No user found"
+          })
+        }
+        let existing= await content.find({userId:user._id}).sort({_id:-1});
+
+
+        if(!existing){
+          return res.status(403).json({
+            succcess:false,
+            message:"No post found"
+          })
+        }
+       let curIndex=Number(contentId);
+      
+
+       let currentPost= existing[curIndex];
+        if (!currentPost) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found at given index",
+      });
+    }
+  
+
+      if(title) currentPost.title=title;
+      if(link) currentPost.link=link;
+      if(tags) currentPost.tags=tags;
+      if(type) currentPost.type=type;
+    
+        await currentPost.save();
+
+        return res.status(201).json({
+          success:true,
+          message:"Title Updated successfully"
+        })
+
+        } catch (error : any) {
+              return res.status(500).json({
+                success:false,
+                message:error.message || "Internal server error"
+            }) 
+        }
     })
 
     router.delete('/content' , middleWareAuth, async(req:Request,res:Response)=>{
@@ -148,4 +268,7 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
             })
         }
     })
+
+
+
     export default router;
