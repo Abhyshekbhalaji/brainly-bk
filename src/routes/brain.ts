@@ -12,19 +12,12 @@ const router=Router();
 
 router.post('/brain/share/:contentId',middleWareAuth , async(req,res)=> {
 try {
-    let token = req.token!;
-       const base_url=process.env.DEPLOY_URL? process.env.DEPLOY_URL:'http://localhost:3000/'
-    if(!req.params.contentId){
-        return res.status(403).json({
-            success:false,
-            message:"Post id is not passed"
-        })
-    }
 
-    let contentId =parseInt(req?.params?.contentId);
-if (!process.env.SECRET_KEY) {
+    let shared= req.body.share!;
+    if (!process.env.SECRET_KEY) {
   throw new Error("SECRET_KEY is missing in environment variables");
 }
+        let token = req.token!;
     let decoded = jwt.verify(token , process.env.SECRET_KEY) as JwtPayload;
     if(!decoded || !decoded.username){
           return res.status(403).json({
@@ -40,6 +33,15 @@ if (!process.env.SECRET_KEY) {
             message:"User might have deactivated or not found"
         })
     }
+    if(!req.params.contentId){
+        return res.status(403).json({
+            success:false,
+            message:"Post id is not passed"
+        })
+    }
+
+    let contentId =parseInt(req?.params?.contentId);
+
     let posts= await content.find({userId:loggedUser._id}).sort({_id:-1});
 
     if(!posts){
@@ -50,7 +52,13 @@ if (!process.env.SECRET_KEY) {
     }
     let post_id= posts[contentId]!._id.toString();
  
-    let hash_id = bcrypt.hashSync(post_id,12);
+   
+
+
+    if(shared){
+     
+       const base_url=process.env.DEPLOY_URL? process.env.DEPLOY_URL:'http://localhost:3000/'
+     let hash_id = bcrypt.hashSync(post_id,12);
    
     let share =await link.create({hashId:hash_id ,postId:posts[contentId], userId:loggedUser});
         await share.save();
@@ -60,6 +68,19 @@ if (!process.env.SECRET_KEY) {
             share_url,
             message:"Link has been generated successfully!!" 
         })
+    }else{
+        await link.deleteOne({
+            userId:loggedUser._id,
+            postId:post_id
+        })
+
+        return res.status(201).json({
+            message:"brain access has been revoked",
+            success:true
+        })
+
+    }
+   
 } catch (error : any) {
         return res.status(500).json({
             message:error.message || "Internal Server error",
@@ -75,7 +96,6 @@ router.get('/brain/share',middleWareAuth , async(req,res)=> {
 try {
     let token = req.token!;
    
-
 if (!process.env.SECRET_KEY) {
   throw new Error("SECRET_KEY is missing in environment variables");
 }
@@ -99,8 +119,7 @@ if (!process.env.SECRET_KEY) {
             success:false,
             message:"User has no post to share"
         })
-    }
-    
+    } 
 
         return res.status(201).json({
             success:true,

@@ -14,8 +14,7 @@ router.get('/link',async(req,res)=>{
      if(!con){
         return res.status(403).json({
             success:false,
-            message:"Invalid hashId. Check the url",
-
+            message:"Access denied to the content",
             post:null
         })
      }
