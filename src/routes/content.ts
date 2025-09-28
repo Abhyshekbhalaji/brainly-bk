@@ -5,12 +5,13 @@ import { content } from "../models/Content.js";
 import jwt ,{JwtPayload} from 'jsonwebtoken';
 import { Users } from "../models/Users.js";
 import {  tag } from "../models/Tag.js";
+import mongoose from "mongoose";
 
 const router=Router();  
 
 router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{    
         try {
-          let {type,link,title,tags}=req.body;
+          let {type,link,title,tags,body=null}=req.body;
         let token = req.headers['token'];  
              if (!token || Array.isArray(token)) {
       return res.status(401).json({ message: "Token missing or invalid" });
@@ -38,7 +39,7 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
               contentTags.push(t);
             }
         }
-         let cn= await content.create({type,link,title,tags:contentTags,userId: user._id });
+         let cn= await content.create({type,link,title,tags:contentTags,userId: user._id,body});
           await cn.save();
             return res.status(201).json({
                 success:true,
@@ -83,7 +84,11 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
                 success:false
             })
          }
-         const payload= await content.find({userId:user._id});  
+     const payload = await content
+  .find({ userId: user._id })
+  .populate('tags', 'title')
+  .sort({ _id: -1 })
+  .exec();
          if(!payload){
             return res.status(201).json({
                 message:"No content posted under this handle",
@@ -223,52 +228,80 @@ router.post('/content', middleWareAuth,async(req:Request,res:Response)=>{
         }
     })
 
-    router.delete('/content' , middleWareAuth, async(req:Request,res:Response)=>{
-        try {
-         let token = req.token!;
-        let {contentId}=req.body;
-              if (!process.env.SECRET_KEY) {
-  throw new Error("SECRET_KEY is missing in environment variables");
-}
-         const decoded= jwt.verify(token,process.env.SECRET_KEY) as JwtPayload;
-      if(!decoded.username){
-               return res.status(402).json({
-                message:"User not available in this db ,Please login again",
-                success:false
-            })
-         }
+ 
+router.delete('/content', middleWareAuth, async (req: Request, res: Response) => {
+    try {
+        const token = req.token!;
+        const { contentId } = req.body;
 
-         const user=  await Users.findOne({username:decoded.username});
-         if(!user){
-            return res.status(402).json({
-                message:"User of this post not available in this db ,Please login again",
-                success:false
-            })
-         }
+  
 
-       const payload = await content.find({ userId: user._id }).sort({ _id: -1 });
-      let doc_del= payload[contentId];
-      if(!doc_del){
-        return res.status(403).json({
-            success:false,
-            message:"No id found"
-        })
-      }
-      await content.findByIdAndDelete(doc_del._id);
-      return res.status(201).json({
-        success:true,
-        message:"The post with the title "+ doc_del.title+" has been deleted" 
-      })
-        
-
-        } catch (error:any) {
-            return res.status(500).json({
-                message:error.message || "Internal server Error",
-                success:false
-            })
+        if (!process.env.SECRET_KEY) {
+            throw new Error("SECRET_KEY is missing in environment variables");
         }
+
+    
+        if (!mongoose.isValidObjectId(contentId)) {
+  
+            return res.status(400).json({
+                success: false,
+                message: "Invalid content ID"
+            });
+        }
+
+        const decoded = jwt.verify(token, process.env.SECRET_KEY) as JwtPayload;
+        if (!decoded.username) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid user. Please login again"
+            });
+        }
+
+        const user = await Users.findOne({ username: decoded.username });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User not found. Please login again"
+            });
+        }
+
+        const contentToDelete = await content.findOne({ 
+            _id: contentId, 
+            userId: user._id 
+        });
+
+        if (!contentToDelete) {
+            console.log('Content not found for deletion:', contentId, 'User:', user._id); // ✅ Debug log
+            return res.status(403).json({
+                success: false,
+                message: "Content not found or you don't have permission to delete it"
+            });
+        }
+
+     
+
+        const deletedContent = await content.findByIdAndDelete(contentId);
+        
+        if (!deletedContent) {
+            throw new Error('Failed to delete content');
+        }
+
+
+
+        return res.status(200).json({
+            success: true,
+            message: `The post titled '${contentToDelete.title}' has been deleted`,
+            deletedId: contentId 
+        });
+
+    } catch (error: any) {
+        console.error('Delete error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error"
+        });
+      }
     })
-
-
+    
 
     export default router;

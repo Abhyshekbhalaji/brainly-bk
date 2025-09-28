@@ -9,7 +9,8 @@ declare module "express-serve-static-core" {
 }
 
 export const middleWareAuth=(req:Request,res:Response,next:NextFunction)=>{
-    const token = req.headers["token"];
+   
+  const token = req.headers["token"];
           if (!token || Array.isArray(token)) {
       return res.status(401).json({ message: "Login before accessing this route" });
     }
