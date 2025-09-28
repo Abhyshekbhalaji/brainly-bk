@@ -92,7 +92,7 @@ router.post('/brain/share', middleWareAuth, async (req, res) => {
             }
 
             // ✅ Create new share link
-            const base_url = process.env.DEPLOY_URL || 'http://localhost:3000/';
+            const base_url = process.env.DEPLOY_URL || 'http://localhost:5173/';
             const hash_id = bcrypt.hashSync(contentId, 12);
             
             const shareLink = await link.create({
