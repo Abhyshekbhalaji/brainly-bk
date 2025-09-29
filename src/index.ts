@@ -13,7 +13,7 @@ app.use(express.json());
 app.use('/api/v1',authRouter);
 app.use('/api/v1',contentRouter);
 app.use('/api/v1',brainRouter);
-app.use('/share',shareRouter)
+app.use('/api/v1/share',shareRouter)
 
 app.use(express.urlencoded({ extended: true }));
 

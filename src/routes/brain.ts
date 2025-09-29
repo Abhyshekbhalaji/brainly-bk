@@ -7,7 +7,8 @@ import { content } from '../models/Content.js';
 import bcrypt from 'bcrypt';
 import { link } from '../models/Link.js';
 import dotenv from "dotenv";
-import mongoose from 'mongoose';
+import mongoose, { Collection } from 'mongoose';
+import { collection } from '../models/Collection.js';
 dotenv.config();
 const router=Router();
 
@@ -16,7 +17,7 @@ router.post('/brain/share', middleWareAuth, async (req, res) => {
     try {
         const { share, contentId } = req.body;  // ✅ Fixed destructuring
         
-        // ✅ Validate required fields
+    
         if (!contentId) {
             return res.status(400).json({
                 success: false,
@@ -137,6 +138,116 @@ router.post('/brain/share', middleWareAuth, async (req, res) => {
         });
     }
 });
+
+
+
+router.post('/brain/collection/share', middleWareAuth, async (req, res) => {
+    try {
+        let  token = req.headers["token"] || req.headers.token;
+        let { share } = req.body;
+        
+       if (!token || Array.isArray(token)) {
+            return res.status(403).json({
+                message: "Login again",
+                success: false,
+            });
+        }
+        
+        if (!process.env.SECRET_KEY) {
+            throw new Error("SECRET_KEY is missing in environment variables");
+        }
+        
+        let { username } = jwt.verify(token, process.env.SECRET_KEY) as JwtPayload;
+        let user = await Users.findOne({ username });
+        
+        if (!user) {
+            return res.status(403).json({
+                message: "User not found in the db",
+                success: false,
+            });
+        }
+        
+        let posts = await content.find({ userId: user._id });
+        
+        if (!posts || posts.length === 0) {
+            return res.status(404).json({
+                message: "User has no posts",
+                success: false,
+            });
+        }
+        
+        // Create collection identifier from post IDs
+        let collectionId = "";
+        let postIds = [];
+        for (let post of posts) {
+            collectionId += post._id;
+            postIds.push(post._id);
+        }
+        
+        const hash_id = bcrypt.hashSync(collectionId, 12);
+        
+        if (share) {
+            // Check if collection already exists
+            const existingLink = await collection.findOne({
+                userId: user._id,
+                collectionId: collectionId
+            });
+            
+            let base_url = process.env.DEPLOY_URL || 'http://localhost:5173/';
+            base_url+='share/collection';
+            
+            if (existingLink) {
+                return res.status(200).json({
+                    message: "Collection link already exists",
+                    success: true,
+                    share_url: base_url + "?hashId=" + existingLink.hashId
+                });
+            } else {
+                // Create new shared collection
+                const newCollection = new collection({
+                    hashId: hash_id,
+                    posts: postIds,
+                    collectionId: collectionId,
+                    userId: user._id,
+                    expires_At: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days expiry
+                });
+                
+                await newCollection.save();
+                
+                return res.status(201).json({
+                    message: "Collection shared successfully",
+                    success: true,
+                    share_url: base_url + "?hashId=" + hash_id
+                });
+            }
+        } else {
+     
+            let doc = await collection.findOneAndDelete({ 
+                userId: user._id,
+                collectionId: collectionId 
+            });
+            
+            if (doc) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'Deleted the shared link'
+                });
+            } else {
+                return res.status(404).json({
+                    success: false,
+                    message: 'No shared link found to delete'
+                });
+            }
+        }
+    } catch (error:any) {
+        console.error('Error in collection share:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal server error"
+        });
+    }
+});
+
 
 
 router.get('/brain/share',middleWareAuth , async(req,res)=> {
